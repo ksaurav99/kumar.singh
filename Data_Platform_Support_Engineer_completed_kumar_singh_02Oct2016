@@ -1,0 +1,262 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import re
+from string import whitespace
+import os
+import sys
+import datetime
+import ast
+import codecs
+
+__author__ = 'kumar'
+MAX_RUN_SIZE = 1
+counter = 1
+
+
+src_file = "cust.dat" #Name of file generated with tuples containing name, email and phone
+
+''' The target file generate will be a CSV file with following format
+    Name, Email, Phone, Cleased_Record_Flag(y/n), Valid Record Flag(y/n)
+
+Note: Cleansed Record Flag: Tell you whether any of the column was cleased or not
+      Valid Record Flag: Tell you based on current rule set whether all the 3 column values are valid or not
+'''
+tgt_file = "cleansed_cust.csv" #Target cleansed file generated after execution of script
+
+name_rep = [('--','-'),('_','')] ##Remove/Replace intance of duplicate characters or replace characters
+name_rule2 = ('<','>','$','%',',','"','@') ##Remove selected list of characters
+email_rep = [(',','.'),('@@','@')] ##Replace some intance of duplicate characters
+email_rem = ('<','>','$','%',',','"') ##Remove selected list of characters
+phone_rep = [('ext.','x'),('extn','x')] ##Replace characters based on defined rules
+phone_rem = ('-','\.','\(','\)') ##Remove selected list of characters
+
+def cleanseName(name):
+  ''' Function to cleanse name string '''
+  cflag = 'n'
+
+  #Control activation of rule
+
+  Activate_Rule1 = 'y'
+  Activate_Rule2 = 'y'
+  Activate_Rule3 = 'y'
+  #apply rule 1
+
+  rname = name # Assign r
+
+  if Activate_Rule1 == 'y': 
+    for i in range(len(name_rep)):
+       #print name_rep[i][0]
+       find = name_rep[i][0]
+       #print name_rep[i][1]
+       replace = name_rep[i][1]
+       rname = rname.replace(find, replace)
+       #rname = re.sub(find,replace, rname)   
+  #apply rule 2
+  if Activate_Rule2 == 'y':
+     #rname = rname.translate(None, ''.join(name_rule2))
+     for i in range(len(name_rule2)):
+       #print name_rule2[i]
+       find = name_rule2[i]
+       #print name_rep[i]
+       replace = ""
+       rname = re.sub(find,replace, rname) 
+
+  if Activate_Rule3 == 'y':
+     #rname = rname.translate(None, ''.join(name_rule2))
+     rname = rname.strip()
+
+  if rname != name:
+    cflag = 'y'      
+
+  return (rname, cflag)
+
+def cleanseEmail(email):
+  ''' Function to cleanse email  '''
+  #apply rule 1
+  cflag = 'n'
+  Activate_Rule1 = 'y'
+  Activate_Rule2 = 'y'
+  Activate_Rule3 = 'y'
+  Activate_Rule4 = 'y'
+  #apply rule 1
+  remail = email # Assign r
+  if Activate_Rule1 == 'y':
+    for i in range(len(email_rep)):
+       #print email_rep[i][0]
+       find = email_rep[i][0]
+       #print email_rep[i][1]
+       replace = email_rep[i][1]
+       remail = re.sub(find,replace, remail)
+  #apply rule 2
+  if Activate_Rule2 == 'y':
+     #rname = rname.translate(None, ''.join(email_rem))
+     for i in range(len(email_rem)):
+       #print email_rem[i]
+       find = email_rem[i]
+       #print email_rem[i]
+       replace = ""
+       remail = re.sub(find,replace, remail)
+
+  if Activate_Rule3 == 'y':
+     remail = remail.strip()
+
+  if Activate_Rule4 == 'y':
+     remail = remail.replace(' ','')
+
+  if remail != email:
+    cflag = 'y'
+
+  return (remail, cflag)
+
+def cleansePhone(phone):
+  ''' Function to cleanse phone number '''
+  #apply rule 1
+  cflag = 'n'
+  Activate_Rule1 = 'y'
+  Activate_Rule2 = 'y'
+  Activate_Rule3 = 'y'
+  #apply rule 1
+  rphone = phone # Assign r
+  if Activate_Rule1 == 'y':
+    for i in range(len(phone_rep)):
+       #print phone_rep[i][0]
+       find = phone_rep[i][0]
+       #print phone_rep[i][1]
+       replace = phone_rep[i][1]
+       rphone = re.sub(find,replace, rphone)
+  #apply rule 2
+  if Activate_Rule2 == 'y':
+     for i in range(len(phone_rem)):
+       #print phone_rem[i]
+       find = phone_rem[i]
+       #print phone_rem[i]
+       replace = ""
+       rphone = re.sub(find,replace, rphone)
+
+  if Activate_Rule3 == 'y':
+     rphone = rphone.replace(' ','')
+  if rphone != phone:
+    cflag = 'y'
+
+  return (rphone, cflag)
+
+def generateCustData(src_path):
+    ''' Generate source data file with some uncleansed, invalid and valida data set '''
+    uncleansed_data = [(' Kumar', 'ksaurav@yahoo.com', '02084789137'),
+			(' Kumar', 'ksaurav@yahoo.com', '02084789137'),
+			('"Kumar"', 'ksaurav@yahoo.com', '02084789137'),
+			('Anna--Marie', 'ksaurav@yahoo.com', '02084789137'),
+			('Kumar_', 'ksaurav@yahoo.com', '02084789137'),
+			('Kumar', 'k saurav@yahoo.com', '02084789137'),
+			(' Kumar', ' ksaurav@yahoo.com', '02084789137'),
+			(' Kumar', 'ksaurav@yahoo,com', '02084789137'),
+			(' Kumar', 'ksaurav@@yahoo.com', '02084789137'),
+			(' Kumar', 'ksaur-av@yahoo.com', '02084789137'),
+			(' Kumar', 'ksaurav@yahoo.com', '(020)84789137'),
+			(' Kumar', 'ksaurav@yahoo.com', '0208-478-9137'),
+			(' Kumar', 'ksaurav@yahoo.com', '0208.478.9137'),
+			(' Kumar', 'ksaurav@yahoo.com', '02084789137 ext 1234'),
+			(' Kumar', 'ksaurav@yahoo.com', '0208 478 9137')]
+    invalid_data = [('Kumar', 'ksaurav@yahoo.com', '020847897'),
+                     ('Kumar', 'ksaurav@yahoo.', '02084789137'),
+		     ('Kumar', 'ksaurav@yahoo.com', '2084789137')]
+    name_gen = "Tom"
+    email_gen = "@abc.com"
+    tel_gen = "8888888000"
+    #open cust file
+    srcfile = open(src_path, "wb")
+    #load  unclenased data
+    for i in range(len(uncleansed_data)):
+       srcfile.write(str(uncleansed_data[i])+"\n")
+    # load invalid data
+    for i in range(len(invalid_data)):
+       srcfile.write(str(invalid_data[i])+"\n")
+    #load valid generated data
+    for i in range(1,1000):
+       tel_no = int(tel_gen) + i
+       print ("('"+name_gen+str(i)+"','"+name_gen+"_"+str(i)+email_gen+"','"+str(tel_no)+"')"+"\n")
+       srcfile.write("('"+name_gen+"_"+str(i)+"','"+name_gen+"_"+str(i)+email_gen+"','"+str(tel_no)+"')"+"\n")
+    srcfile.close()
+
+def validateName(name):
+    ''' Function for validation of Name, based on defined rules '''
+  #for name in names:
+    regex = re.compile(r'^[^\W_]+(-[^\W_]+)?$', re.U)
+    # print u'{0:20} {1}'.format(name, regex.match(name) is not None)
+    print name
+    if regex.match(name):
+     return 'y'
+    else: 
+     return 'n'
+
+def validateEmail(email):
+    ''' Function for validation of Email, based on defined rules'''
+    regex = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', re.U)
+    print email
+    if regex.match(email):
+     return 'y'
+    else: 
+     return 'n'
+
+def validatePhone(phone):
+    '''Function for validation of Name, based on defined rules'''
+    regex = re.compile(r'(\d{3}\D*(\d{3}))\D*(\d{4})\D*(\d*)$' , re.VERBOSE)
+    print phone
+    if regex.match(phone):
+     return 'y'
+    else: 
+     return 'n'
+    #return regex.match(phone)
+
+#src_file = "cust.dat"
+#tgt_file = "cleansed_cust.csv"
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        raise Exception("Please specify the path to the source data.")
+    else:
+        FILE_DIR_PATH = sys.argv[1]
+        if not os.path.isdir(FILE_DIR_PATH):
+            raise Exception("Invalid or not found path for Source Input: %s" % FILE_DIR_PATH)
+    src_path = FILE_DIR_PATH + src_file
+
+    generateCustData(src_path)
+
+    tgt_path = FILE_DIR_PATH + tgt_file
+    
+    outfile = open(tgt_path, "wb")
+
+    for line in codecs.open(src_path, "r", encoding="utf-8"):
+      valid_rec = 'y'
+      cust_valid = 'y'
+      email_valid = 'y'
+      phone_valid = 'y'
+      cleansed_rec = 'n'
+   
+      rec = eval(line)
+      
+      tname = cleanseName(rec[0])
+      cname = tname[0]
+      cust_valid = validateName(cname)
+
+      temail = cleanseEmail(rec[1])
+      cemail = temail[0]
+      email_valid = validateEmail(cemail)
+
+      tphone = cleansePhone(rec[2])
+      cphone = tphone[0]
+      phone_valid = validatePhone(cphone)
+
+      print tname[1] + temail[1] + tphone[1]
+
+      if (tname[1] == 'y'  or temail[1] == 'y' or tphone[1] == 'y'):
+         cleansed_rec = 'y' 
+
+      if (cust_valid != 'y'  or email_valid != 'y' or phone_valid != 'y'):
+         valid_rec = 'n'
+      
+      outfile.write(cname + "," + cemail + "," + cphone + "," + cleansed_rec + "," + valid_rec + "\n");
+    outfile.close()
+    
